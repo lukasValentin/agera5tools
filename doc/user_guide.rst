@@ -923,7 +923,14 @@ specify the hostname and port number with `AgERA5WeatherDataProvider(longitude=8
 A note on efficient database loading
 ====================================
 
-Using ``agera5tools build`` for large areas and/or long time-series can be notoriously inefficient because of the large number of records that have to be loaded into the database. In such cases it is more efficient to dump data to CSV first and load the CSV files with dedicated loader tools. Moreover, for efficient loading it is best to disable any keys and lock the table for exclusive write mode, which is not done by agera5tools. Below I show an example of how efficient loading can be done for MySQL (or MariaDB) and PostgreSQL.
+Using ``agera5tools build`` for large areas and/or long time-series can take a long time because of the large number of records that have to be loaded into the database. Currently, the most efficient solution is DuckDB (the default database choice) because it direcly loads from a pandas dataframe to a DuckDB database without any intermediate steps. However, in some cases using DuckDB is not possible and another relational database has to be used. In such cases it is more efficient to dump data to CSV first and load the CSV files with dedicated loader tools, particularly for large setups. Moreover, for efficient loading it is best to disable any keys and lock the table for exclusive write mode, which is not done by agera5tools. Below I show an example of how efficient loading can be done for MySQL (or MariaDB) and PostgreSQL.
+
+.. note::
+
+    The remarks given above on efficient database loading do not apply to the default column-oriented duckdb database.
+    However, for classical row-oriented database like MySQL, PostgreSQL and ORACLE it is strongly advised to choose
+    an appropriate approach for loading data.
+
 
 Bulk loading AgERA5 with MySQL
 ------------------------------

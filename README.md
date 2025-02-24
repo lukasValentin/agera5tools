@@ -249,6 +249,8 @@ The agera5tools package requires python >=3.8 and has a number of dependencies:
 - netCDF4 >= 1.6
 - requests >= 2.28
 - wsgiserver >= 1.3
+- duckdb >= 1.1.3
+- duckdb_engine >= 0.13.6
  
 Lower versions of dependencies may work, but have not been tested.
  

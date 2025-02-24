@@ -7,7 +7,7 @@ from pathlib import Path
 import logging
 import logging.config
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 # This will be set to 1 only for commandline mode. Not when importing
 # agera5tools in python.
@@ -147,7 +147,8 @@ def read_config(mk_paths=True):
 if "READTHEDOCS" not in os.environ:  # Avoid imports for building documentation on RTD
     has_filesystem = True
     config = read_config(mk_paths=has_filesystem)
-    setup_logging(config, has_filesystem)
+    if config is not None:
+        setup_logging(config, has_filesystem)
 
     from . import util
     from .dump_grid import dump_grid

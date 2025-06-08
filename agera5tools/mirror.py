@@ -26,7 +26,7 @@ def find_days_in_database():
     idgrid = get_grid(engine, config.misc.reference_point.lon, config.misc.reference_point.lat,
                       config.database.grid_table_name, config.misc.grid_search_radius)
     with engine.connect() as DBconn:
-        sql = f"select day from {config.database.agera5_table_name} where idgrid={idgrid}"
+        sql = sa.text(f"select day from {config.database.agera5_table_name} where idgrid={idgrid}")
         df = pd.read_sql_query(sql, DBconn)
     dates = {d.day for d in df.itertuples()}
     return dates

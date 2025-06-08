@@ -20,6 +20,7 @@ warnings.filterwarnings("ignore")
 
 import click
 import sqlalchemy as sa
+from tqdm import tqdm
 
 from . import config
 from .dump_grid import dump_grid
@@ -115,6 +116,7 @@ def fill_grid_table():
     """
     logger = logging.getLogger(__name__)
 
+    click.echo("  Loading meteo grid definition.")
     df = dump_grid()
     # Subset grid to only contain relevant region
     ix = ((df.latitude >= config.region.boundingbox.lat_min) &
@@ -134,7 +136,7 @@ def fill_grid_table():
     try:
         with engine.begin() as DBconn:
             ins = tbl.insert()
-            for chunk in chunker(recs, config.database.chunk_size):
+            for chunk in tqdm(chunker(recs, config.database.chunk_size)):
                 DBconn.execute(ins, chunk)
                 nrecs_written += len(chunk)
                 msg = f"Written {nrecs_written} from total {len(recs)} records to database."
@@ -145,6 +147,20 @@ def fill_grid_table():
         msg = f"Grid definition already exists in grid table! No records written."
         click.echo(msg)
         logger.info(msg)
+
+
+def check_reference_point():
+    """Checks if the reference point defined in the YAML config is actually within the lon/lat bounds
+    """
+
+    if not (config.region.lon_min < config.misc.reference_point.lon < config.region.lon_max):
+        msg = "Longitude of reference point is not in lon_min/max of region: check config file."
+        click.echo(msg)
+        sys.exit()
+    if not (config.region.lat_min < config.misc.reference_point.lat < config.region.lat_max):
+        msg = "Latitude of reference point is not in lat_min/max of region: check config file."
+        click.echo(msg)
+        sys.exit()
 
 
 def build_database():
@@ -202,6 +218,7 @@ def init():
 
     set_CDSAPI_credentials()
     make_paths()
+    check_reference_point()
     build_database()
     fill_grid_table()
 

@@ -12,6 +12,7 @@ import calendar
 from math import log10
 
 import pandas as pd
+import sqlalchemy as sa
 from numpy import arccos, cos, radians, sin
 
 import yaml
@@ -248,13 +249,17 @@ def number_days_in_month(year, month):
 
 
 def get_grid(engine, lon, lat, grid_table_name, search_radius):
-    sql = f""" 
+    sql = sa.text(f""" 
     SELECT idgrid, longitude, latitude
     FROM {grid_table_name}
     WHERE latitude < {lat + search_radius} AND latitude > {lat - search_radius} AND 
         longitude < {lon + search_radius} AND longitude > {lon - search_radius} 
-    """
+    """)
     df = pd.read_sql_query(sql, engine)
+    if len(df) == 0:
+        msg = f"No grids found for longitude {lon} and latitude {lat}. Are you sure there is data for loaded for this location?"
+        raise RuntimeError(msg)
+
     if len(df) > 0:
         tiny = 0.001
         df["dist"] = (6371 * arccos(cos(radians(lat + tiny)) * cos(radians(df.latitude.values)) *

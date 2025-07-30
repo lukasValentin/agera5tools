@@ -96,11 +96,16 @@ def download_one_month(input):
     cds_query.update(cds_variable_details)
 
     download_fname = config.data_storage.tmp_path / f"cds_download_{uuid4()}.zip"
-    c = cdsapi.Client(quiet=True)
-    c.retrieve('sis-agrometeorological-indicators', cds_query, download_fname)
+    logger = logging.getLogger(__name__)
+
+    try:
+        c = cdsapi.Client(quiet=True)
+        c.retrieve('sis-agrometeorological-indicators', cds_query, download_fname)
+    except Exception as e:
+        logger.error(e)
+        exit(-1)
 
     msg = f"Downloaded data for {agera5_variable_name} for {year}-{month:02} to {download_fname}."
-    logger = logging.getLogger(__name__)
     logger.debug(msg)
 
     return dict(year=year, month=month, varname=agera5_variable_name, download_fname=download_fname)

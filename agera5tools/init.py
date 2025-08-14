@@ -96,12 +96,12 @@ def create_AgERA5_config():
         if r is False:
             return False
 
-    # Write a new config file, but first replace the /USERHOME/ with the users
+    # Write a new config file, but first replace the /A5STORAGE/ with the users
     # current directory
     cwd = str(Path.cwd()) + "/"
     template_agera5t_config = Path(__file__).parent / "agera5tools.yaml"
     agera5t_config = open(template_agera5t_config).read()
-    agera5t_config = agera5t_config.replace("/USERHOME/", cwd)
+    agera5t_config = agera5t_config.replace("/A5STORAGE/", cwd)
     with open(agera5_conf, "w") as fp:
         fp.write(agera5t_config)
 
@@ -124,7 +124,7 @@ def fill_grid_table():
           (df.longitude >= config.region.boundingbox.lon_min) &
           (df.longitude <= config.region.boundingbox.lon_max))
     df = df[ix]
-    df = (df.drop(columns=["ll_latitude", "ll_longitude", "land_fraction"])
+    df = (df.drop(columns=["land_fraction"])
             .rename(columns={"idgrid_era5": "idgrid"}))
 
     engine = sa.create_engine(config.database.dsn)
@@ -153,11 +153,11 @@ def check_reference_point():
     """Checks if the reference point defined in the YAML config is actually within the lon/lat bounds
     """
 
-    if not (config.region.lon_min < config.misc.reference_point.lon < config.region.lon_max):
+    if not (config.region.boundingbox.lon_min < config.misc.reference_point.lon < config.region.boundingbox.lon_max):
         msg = "Longitude of reference point is not in lon_min/max of region: check config file."
         click.echo(msg)
         sys.exit()
-    if not (config.region.lat_min < config.misc.reference_point.lat < config.region.lat_max):
+    if not (config.region.boundingbox.lat_min < config.misc.reference_point.lat < config.region.boundingbox.lat_max):
         msg = "Latitude of reference point is not in lat_min/max of region: check config file."
         click.echo(msg)
         sys.exit()
@@ -216,6 +216,18 @@ def init():
         click.echo(msg)
         return False
 
+
+    def check_version():
+        """Checks the version of the AGERA5TOOLS config file and exits if incompatible.
+
+        """
+        if config.version < 2.0:
+            msg = ("This seems to be an old agera5tools config file which is not compatible with this version."
+                   "Generate a new one with `agera5tools init`")
+            click.echo(msg)
+            sys.exit()
+
+    check_version()
     set_CDSAPI_credentials()
     make_paths()
     check_reference_point()

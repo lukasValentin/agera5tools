@@ -6,10 +6,12 @@ from uuid import uuid4
 import datetime as dt
 import concurrent.futures
 import copy
+import time
 
 import cdsapi
 import pandas as pd
 import sqlalchemy as sa
+from requests.exceptions import SSLError, HTTPError
 
 from .util import variable_names, get_grid
 from .build import unpack_cds_download, convert_ncfiles_to_dataframe, df_to_csv, df_to_database
@@ -23,11 +25,12 @@ def find_days_in_database():
     :return: A set of date objects present in the database
     """
     engine = sa.create_engine(config.database.dsn)
-    idgrid = get_grid(engine, config.misc.reference_point.lon, config.misc.reference_point.lat,
-                      config.database.grid_table_name, config.misc.grid_search_radius)
     with engine.connect() as DBconn:
+        idgrid = get_grid(DBconn, config.misc.reference_point.lon, config.misc.reference_point.lat,
+                          config.database.grid_table_name, config.misc.grid_search_radius)
         sql = sa.text(f"select day from {config.database.agera5_table_name} where idgrid={idgrid}")
         df = pd.read_sql_query(sql, DBconn)
+    engine.dispose()
     dates = {d.day for d in df.itertuples()}
     return dates
 
@@ -68,6 +71,8 @@ def download_one_day(input):
     cds_variable_details = copy.deepcopy(variable_names[agera5_variable_name])
     version = str(config.misc.agera5_version).replace(".", "_")
 
+    logger = logging.getLogger(__name__)
+
     cds_query = {
             'format': 'zip',
             'variable': cds_variable_details.pop("variable"),
@@ -80,17 +85,27 @@ def download_one_day(input):
     cds_query.update(cds_variable_details)
 
     download_fname = config.data_storage.tmp_path / f"cds_download_{uuid4()}.zip"
-    c = cdsapi.Client(quiet=True)
-    logger = logging.getLogger(__name__)
-    try:
-        c.retrieve('sis-agrometeorological-indicators', cds_query, download_fname)
-        msg = f"Downloaded data for {agera5_variable_name} for {day} to {download_fname}."
-        logger.debug(msg)
-    except Exception as e:
-        logger.exception(f"Failed downloading {agera5_variable_name} - {day}")
-        download_fname = None
+    done = False
+    for ntry in range(config.cdsapi.max_tries):
+        try:
+            c = cdsapi.Client(quiet=True)
+            c.retrieve('sis-agrometeorological-indicators', cds_query, download_fname)
+            msg = f"Downloaded data for {agera5_variable_name} for {day} to {download_fname}."
+            logger.debug(msg)
+            done = True
+            break
+        except (SSLError, HTTPError) as e:
+            msg = f"Download failed for {agera5_variable_name} for {day} at try {ntry}. Retrying after 5 minutes."
+            logger.warning(msg)
+            time.sleep(300)
+        except Exception as e:
+            logger.exception(f"Failed downloading {agera5_variable_name} - {day}")
+            break
+    else:
+        msg = f"Download failed for {agera5_variable_name} for {day} after {config.cdsapi.max_tries} retries."
+        logger.error(msg)
 
-    return dict(day=day, varname=agera5_variable_name, download_fname=download_fname)
+    return dict(day=day, varname=agera5_variable_name, download_fname=download_fname, success=done)
 
 
 def mirror(to_csv=True, dry_run=False):
@@ -122,11 +137,13 @@ def mirror(to_csv=True, dry_run=False):
             to_download.append((varname, day))
 
         logger.info(f"Starting concurrent CDS download of {len(to_download)} AgERA5 variables.")
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(to_download)) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=config.cdsapi.concurrent_downloads) as executor:
             downloaded_sets = executor.map(download_one_day, to_download)
 
         downloaded_ncfiles = []
         for dset in downloaded_sets:
+            if dset["success"] is False:
+                continue
             ncfiles = unpack_cds_download(dset)
             downloaded_ncfiles.extend(ncfiles)
 
@@ -135,7 +152,11 @@ def mirror(to_csv=True, dry_run=False):
             continue
 
         df = convert_ncfiles_to_dataframe(downloaded_ncfiles)
-        df_to_database(df, descriptor=day)
+
+        success = df_to_database(df, descriptor=day)
+        if not success:
+            days_failed.add(day)
+
         if to_csv:
             csv_fname = config.data_storage.csv_path / f"weather_grid_agera5_{day}.csv.gz"
             df_to_csv(df, csv_fname)

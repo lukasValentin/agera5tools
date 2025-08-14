@@ -8,10 +8,10 @@
 #
 # on MS Windows:
 #   set AGERA5TOOLS_CONFIG=c:/path/to/agera5tools.yaml
-version: 0.1
+version: 2.0
 logging:
   # Details for the log. Log levels follow conventions of the python logging framework.
-  log_path: /USERHOME/agera5/logs
+  log_path: /A5STORAGE/logs
   log_fname: agera5tools.log
   log_level_console: ERROR
   log_level_file: INFO
@@ -43,38 +43,40 @@ misc:
     lat: 23.97
   grid_search_radius: 0.2
   kelvin_to_celsius: yes
-  agera5_version: "1.1"
+  agera5_version: "2.0"
 cdsapi:
   # Details for the Copernicus Climate Data Store. Information here will be written into the
   # $HOME/.cdsapirc file, which is used by the python API client for the CDS.
   url: https://cds.climate.copernicus.eu/api
   key: <PERSONAL-ACCESS-TOKEN here>
+  max_tries: 5
+  concurrent_downloads: 5
 database:
   # Details for the database that will be used to store the AgERA5 data.
   # The data source name (dsn) points to the database and should have the form of an
   # SQLAlchemy database URL: https://docs.sqlalchemy.org/en/20/core/engines.html
   # Note that the URL may contain the database password in plain text which is a security
   # risk.
-  dsn: duckdb:////USERHOME/agera5/agera5.ddb
+  dsn: duckdb:////A5STORAGE/agera5.ddb
   agera5_table_name: weather_grid_agera5
   grid_table_name: grid_agera5
   chunk_size: 10000
 data_storage:
   # Storage path for NetCDF files, CSV files and temporary storage.
-  netcdf_path: /USERHOME/agera5/ncfiles/
+  netcdf_path: /A5STORAGE/ncfiles/
   keep_netcdf: yes
-  tmp_path: /USERHOME/agera5/tmp
-  csv_path: /USERHOME/agera5/csv
+  tmp_path: /A5STORAGE/tmp
+  csv_path: /A5STORAGE/csv
 variables:
   # Select which variables should be downloaded from the CDS
   Temperature_Air_2m_Mean_24h: yes
   Temperature_Air_2m_Mean_Day_Time: no
   Temperature_Air_2m_Mean_Night_Time: no
   Dew_Point_Temperature_2m_Mean: no
-  Temperature_Air_2m_Max_24h: no
-  Temperature_Air_2m_Min_24h: no
-  Temperature_Air_2m_Max_Day_Time: yes
-  Temperature_Air_2m_Min_Night_Time: yes
+  Temperature_Air_2m_Max_24h: yes
+  Temperature_Air_2m_Min_24h: yes
+  Temperature_Air_2m_Max_Day_Time: no
+  Temperature_Air_2m_Min_Night_Time: no
   Cloud_Cover_Mean: no
   Snow_Thickness_LWE_Mean: no
   Snow_Thickness_Mean: no
@@ -89,3 +91,8 @@ variables:
   Relative_Humidity_2m_18h: no
   Precipitation_Rain_Duration_Fraction: no
   Precipitation_Solid_Duration_Fraction: no
+  Precipitation_Duration_Fraction: no
+  Derived_Relative_Humidity_2m_Max: no
+  Derived_Relative_Humidity_2m_Min: no
+  ReferenceET_PenmanMonteith_FAO56: yes
+  Vapour_Pressure_Deficit_at_Maximum_Temperature: no

@@ -7,7 +7,7 @@ from pathlib import Path
 import logging
 import logging.config
 
-__version__ = "2.1.1"
+__version__ = "2.2.0"
 
 # This will be set to 1 only for commandline mode. Not when importing
 # agera5tools in python.
@@ -129,8 +129,15 @@ def read_config(mk_paths=True):
             sys.exit()
 
         c =  DotMap(r, _dynamic=False)
+        # Check version
+        if c.version < 2.0:
+            msg = ("WARNING: This seems to be an old agera5tools config file which is not compatible with \n"
+                   "this version. Generate a new one with `agera5tools init`")
+            click.echo(msg)
+            sys.exit()
+
         # Update config values into proper objects
-        c.region.boundingbox = util.BoundingBox(**c.region.boundingbox)
+        c.region.boundingbox = BoundingBox(**c.region.boundingbox)
         c.data_storage.netcdf_path = Path(c.data_storage.netcdf_path)
         c.data_storage.tmp_path = Path(c.data_storage.tmp_path)
         c.data_storage.csv_path = Path(c.data_storage.csv_path)

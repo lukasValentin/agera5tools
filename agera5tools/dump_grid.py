@@ -18,9 +18,8 @@ def dump_grid():
     df = df[df.idgrid_era5 != -999]
     df.reset_index(inplace=True)
     # compute grid centre instead of lower left
-    df["latitude"] = df.lat + 0.05
-    df["longitude"] = df.lon + 0.05
-    df = df.rename(columns={"lon": "ll_longitude", "lat": "ll_latitude"})
+    df["latitude"] = df.lat
+    df["longitude"] = df.lon
     # Only keep grids with land areas
     ix = df.land_fraction > 0
     df = df[ix]

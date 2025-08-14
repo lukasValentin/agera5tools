@@ -18,6 +18,7 @@ import cdsapi
 import sqlalchemy as sa
 import duckdb
 import xarray as xr
+from requests.exceptions import SSLError, HTTPError
 
 from .util import number_days_in_month, variable_names, create_target_fname, last_day_in_month, \
     add_grid, convert_to_celsius, chunker
@@ -27,8 +28,9 @@ from . import config
 def parse_date_from_zipfname(zipfname):
     """Parse the date from the filename and returns a date object.
     """
-    d = zipfname.filename.split("_")[3]
+    d = zipfname.filename.split("_")[-2]
     d = dt.datetime.strptime(d, "%Y%m%d")
+
     return d.date()
 
 
@@ -84,6 +86,8 @@ def download_one_month(input):
     cds_variable_details = copy.deepcopy(variable_names[agera5_variable_name])
     version = str(config.misc.agera5_version).replace(".", "_")
 
+    logger = logging.getLogger(__name__)
+
     cds_query = {
             'format': 'zip',
             'variable': cds_variable_details.pop("variable"),
@@ -93,17 +97,31 @@ def download_one_month(input):
             'area': config.region.boundingbox.get_cds_bbox(),
             'version': f'{version}'
         }
-    cds_query.update(cds_variable_details)
+    cds_query.update(cds_variable_details)  # This adds 'time' or 'statistic' to the query, if applicable
 
     download_fname = config.data_storage.tmp_path / f"cds_download_{uuid4()}.zip"
-    c = cdsapi.Client(quiet=True)
-    c.retrieve('sis-agrometeorological-indicators', cds_query, download_fname)
+    done = False
+    for ntry in range(config.cdsapi.max_tries):
+        try:
+            c = cdsapi.Client(quiet=True)
+            c.retrieve('sis-agrometeorological-indicators', cds_query, download_fname)
+            msg = f"Downloaded data for {agera5_variable_name} for {year}-{month:02} to {download_fname} after {ntry} tries."
+            logger.debug(msg)
+            done = True
+            break
+        except (SSLError, HTTPError) as e:
+            msg = f"Download failed for {agera5_variable_name} for {year}-{month:02} at try {ntry}. Retrying after 5 minutes."
+            logger.warning(msg)
+            time.sleep(300)
+        except Exception as e:
+            msg = f"Fatal download error for {agera5_variable_name} for {year}-{month:02}."
+            logger.exception(msg)
+            break
+    else:
+        msg = f"Failed downloading data for {agera5_variable_name} for {year}-{month:02} after {config.cdsapi.max_tries} retries."
+        logger.error(msg)
 
-    msg = f"Downloaded data for {agera5_variable_name} for {year}-{month:02} to {download_fname}."
-    logger = logging.getLogger(__name__)
-    logger.debug(msg)
-
-    return dict(year=year, month=month, varname=agera5_variable_name, download_fname=download_fname)
+    return dict(year=year, month=month, varname=agera5_variable_name, download_fname=download_fname, success=done)
 
 
 def determine_build_range():
@@ -144,12 +162,12 @@ def modify_dataframe(df):
             .rename(columns=rename_cols)
           )
     # Drop lat/lon columns if an idgrid column is present
-    # otherwise, add 0.05 to move coordinates to grid centre
     if "idgrid" in df.columns:
         df = df.drop(columns=["lat", "lon"])
-    else:
-        df["lat"] += 0.05
-        df["lon"] += 0.05
+
+    # Drop the 'crs' column if present
+    if "crs" in df.columns:
+        df = df.drop(columns=["crs"])
 
     # Convert day to a proper date object
     df["day"] = df["day"].dt.date
@@ -195,11 +213,13 @@ def df_to_database(df, descriptor):
     """
     logger = logging.getLogger(__name__)
     t1 = time.time()
+    success = False
     try:
         if config.database.dsn.startswith("duckdb"):
             fname_duckdb = Path(config.database.dsn.replace("duckdb:///", ""))
             with duckdb.connect(fname_duckdb) as DBconn:
                 DBconn.sql(f"INSERT INTO {config.database.agera5_table_name} BY NAME SELECT * FROM df")
+            success = True
         else:
             engine = sa.create_engine(config.database.dsn)
             meta = sa.MetaData()
@@ -213,11 +233,14 @@ def df_to_database(df, descriptor):
                     nrecs_written += len(chunk)
                     msg = f"Written {nrecs_written} from total {len(recs)} records to database."
                     logger.info(msg)
+            success = True
         logger.info(f"Written AgERA5 data for {descriptor} to database in {time.time()-t1} seconds.")
     except (sa.exc.IntegrityError, duckdb.duckdb.ConstraintException) as e:
         logger.warning(f"Failed inserting AgERA5 data for {descriptor}: duplicate rows!")
     except Exception as e:
-        logger.error(f"Failed inserting AgERA5 data for {descriptor}: {e}!")
+        logger.exception(f"Failed inserting AgERA5 data for {descriptor}.")
+
+    return success
 
 
 def df_to_csv(df, csv_fname, filemode="w"):
@@ -320,11 +343,13 @@ def build(year_month=None, to_database=True, to_csv=False):
         actual_downloads = [inp for inp in potential_downloads if not nc_files_available(*inp)]
         if actual_downloads:
             logger.info(f"Starting concurrent CDS download of {len(actual_downloads)} AgERA5 variables.")
-            with concurrent.futures.ThreadPoolExecutor(max_workers=len(actual_downloads)) as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=config.cdsapi.concurrent_downloads) as executor:
                 downloaded_sets = executor.map(download_one_month, actual_downloads)
 
             downloaded_ncfiles = []
             for dset in downloaded_sets:
+                if dset["success"] is False:
+                    continue
                 ncfiles = unpack_cds_download(dset)
                 downloaded_ncfiles.extend(ncfiles)
         else:

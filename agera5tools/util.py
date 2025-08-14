@@ -32,17 +32,22 @@ variable_names = {'Temperature_Air_2m_Mean_24h': dict(variable="2m_temperature",
                   'Cloud_Cover_Mean': dict(variable="cloud_cover", statistic ="24_hour_mean"),
                   'Snow_Thickness_LWE_Mean': dict(variable="snow_thickness_lwe", statistic ="24_hour_mean"),
                   'Snow_Thickness_Mean': dict(variable="snow_thickness", statistic ="24_hour_mean"),
-                  'Vapour_Pressure_Mean': dict(variable="vapour_pressure", statistic ="24_hour_mean"),
+                  'Vapour_Pressure_Mean_24h': dict(variable="vapour_pressure", statistic ="24_hour_mean"),
                   'Precipitation_Flux': dict(variable="precipitation_flux"),
                   'Solar_Radiation_Flux': dict(variable="solar_radiation_flux"),
-                  'Wind_Speed_10m_Mean': dict(variable="10m_wind_speed", statistic="24_hour_mean"),
+                  'Wind_Speed_10m_Mean_24h': dict(variable="10m_wind_speed", statistic="24_hour_mean"),
                   'Relative_Humidity_2m_06h': dict(variable="2m_relative_humidity", time="06_00"),
                   'Relative_Humidity_2m_09h': dict(variable="2m_relative_humidity", time="09_00"),
                   'Relative_Humidity_2m_12h': dict(variable="2m_relative_humidity", time="12_00"),
                   'Relative_Humidity_2m_15h': dict(variable="2m_relative_humidity", time="15_00"),
                   'Relative_Humidity_2m_18h': dict(variable="2m_relative_humidity", time="18_00"),
                   'Precipitation_Rain_Duration_Fraction': dict(variable="solid_precipitation_duration_fraction"),
-                  'Precipitation_Solid_Duration_Fraction': dict(variable="liquid_precipitation_duration_fraction")
+                  'Precipitation_Solid_Duration_Fraction': dict(variable="liquid_precipitation_duration_fraction"),
+                  'Precipitation_Duration_Fraction': dict(variable="precipitation_duration_fraction"),
+                  'Derived_Relative_Humidity_2m_Max': dict(variable="2m_relative_humidity_derived", statistic="24_hour_maximum"),
+                  'Derived_Relative_Humidity_2m_Min': dict(variable="2m_relative_humidity_derived", statistic="24_hour_minimum"),
+                  'ReferenceET_PenmanMonteith_FAO56': dict(variable="reference_evapotranspiration"),
+                  'Vapour_Pressure_Deficit_at_Maximum_Temperature': dict(variable="vapour_pressure_deficit_at_maximum_temperature"),
                   }
 
 
@@ -248,14 +253,14 @@ def number_days_in_month(year, month):
     return 30
 
 
-def get_grid(engine, lon, lat, grid_table_name, search_radius):
+def get_grid(DBconn, lon, lat, grid_table_name, search_radius):
     sql = sa.text(f""" 
     SELECT idgrid, longitude, latitude
     FROM {grid_table_name}
     WHERE latitude < {lat + search_radius} AND latitude > {lat - search_radius} AND 
         longitude < {lon + search_radius} AND longitude > {lon - search_radius} 
     """)
-    df = pd.read_sql_query(sql, engine)
+    df = pd.read_sql_query(sql, DBconn)
     if len(df) == 0:
         msg = f"No grids found for longitude {lon} and latitude {lat}. Are you sure there is data for loaded for this location?"
         raise RuntimeError(msg)

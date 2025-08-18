@@ -266,6 +266,12 @@ API Key is not the same as your password that you used to register on the CDS.
 Moreover, if you are already using the python `cdsapi` package to retrieve data from the CDS,
 you probably already have a `.cdsapirc` file in your home folder and you can skip this step.
 
+Further, there is an option `max_tries` that specifies the maximum number of tries that agera5tools
+will make to download a file from the cDS. The `concurrent_downloads` specifies the maximum number of simultaneous
+requests to the CDS that agera5tools will make. Increasing the number may speed up downloads at the
+risk of running into a rate limit and you requests being discarded. According to the documentation
+the maximum value is around 9 concurrent requests.
+
 .. _`CDS`: https://cds.climate.copernicus.eu
 
 .. warning::
@@ -281,6 +287,8 @@ you probably already have a `.cdsapirc` file in your home folder and you can ski
       # $HOME/.cdsapirc file, which is used by the python API client for the CDS.
       url: https://cds.climate.copernicus.eu/api
       key: <PERSONAL-ACCESS-TOKEN here>
+      max_tries: 5
+      concurrent_downloads: 5
 
 .. warning::
 
@@ -347,7 +355,7 @@ AgERA5 variable selection
 .........................
 
 The YAML configuration below can be used to select which AgERA5 variables must be downloaded
-and made available through the web API. By default 7 variables are selected which are used
+and made available through the web API. By default 8 variables are selected which are used
 to run common crop simulation models like WOFOST, LINGRA, DSSAT, etc.
 
 .. code:: yaml
@@ -755,6 +763,29 @@ provided, the `extract_point` command will send its output to standard output in
     2022-06-04,   2.16,16276887,  32.50,  28.10,  26.70,  32.77,   3.69
     2022-06-05,   3.09,18650926,  32.79,  29.38,  26.75,  34.05,   3.82
 
+
+Note that specifying negative latitude/longitude values will lead to an error because agera5tools interprets
+this as a commandline option:
+
+.. code:: bash
+
+    $ agera5tools extract_point 90 -24 2022-06-01 2022-06-05
+    using config from /data/wit015/agera5/agera5tools.yaml
+    Usage: agera5tools extract_point [OPTIONS] LONGITUDE LATITUDE STARTDATE
+                                     ENDDATE
+    Try 'agera5tools extract_point --help' for help.
+
+    Error: No such option: -2
+
+The solution is to specify it like this:
+
+.. code:: bash
+
+    $ agera5tools extract_point -- 90 -24 2022-06-01 2022-06-05
+    using config from /data/wit015/agera5/agera5tools.yaml
+    the point with longitude  90.00 and latitude -24.00 is not within the boundingbox of this setup
+
+Although this point itself is not within geographic boundaries of the example used here.
 
 Dump_grid
 ---------

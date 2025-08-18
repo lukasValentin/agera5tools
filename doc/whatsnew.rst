@@ -1,6 +1,26 @@
 What's new
 ==========
 
+Version 3.0
+-----------
+
+Agera5tools version 3.0 is now compatible with AgERA5 v2.0 and *will not work* with AgERA5 v1.1.
+Use agera5tools v2.1 for AgERA5 v1.1.
+
+
+Other improvements:
+
+ - Downloading data is now more robust and the system will re-try to download when a download failes.
+ - The number of concurrent download is variable and can be adapted.
+
+See the description of the configuration file under section `cdsapi` for explanation of the options.
+
+.. warning::
+
+    Mixing agERA5 versions is not recommended therefore upgrading to agera5tools v3.0 means rebuilding the database
+    using AgERA5 v2.0 data.
+
+
 Version 2.1
 -----------
 

@@ -82,8 +82,8 @@ variables:
   Snow_Thickness_Mean: no
   Vapour_Pressure_Mean: yes
   Precipitation_Flux: yes
-  Solar_Radiation_Flux: yes
-  Wind_Speed_10m_Mean: yes
+  Solar_Radiation_Flux_24h: yes
+  Wind_Speed_10m_Mean_24h: yes
   Relative_Humidity_2m_06h: no
   Relative_Humidity_2m_09h: no
   Relative_Humidity_2m_12h: no
